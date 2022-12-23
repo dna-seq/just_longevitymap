@@ -15,6 +15,17 @@ requires:
 - gnomad
 - ncbigene
 - vcfinfo
+input_columns:
+- dbsnp__rsid
+- base__alt_base
+- vcfinfo__zygosity
+- base__alt_base
+- base__ref_base
+- base__coding
+- base__cchange
+- clinvar__disease_names
+- gnomad__af
+- ncbigene__ncbi_desc
 tags:
 - longevity
 output_columns:
