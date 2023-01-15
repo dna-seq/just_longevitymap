@@ -12,7 +12,7 @@ CONFLICTED_CONST = "conflicted"
 CONFLICTED_INDEX = -1
 
 class CravatPostAggregator (BasePostAggregator):
-    sql_insert = """ INSERT INTO longevitymap (
+    sql_insert:str = """ INSERT INTO longevitymap (
                 weight,
                 weightcolor,
                 population,
@@ -32,26 +32,26 @@ class CravatPostAggregator (BasePostAggregator):
                 ncbidesc         
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) """
 
-    ref_homo = longevitymap_ref_homo.RefHomoEdgecases()
+    ref_homo:longevitymap_ref_homo.RefHomoEdgecases = longevitymap_ref_homo.RefHomoEdgecases()
 
     def check(self):
         return True
 
 
-    def get_nucleotides(self, ref, alt, zygocity):
+    def get_nucleotides(self, ref:str, alt:str, zygocity:str) -> (str, set[str]):
         if zygocity == 'hom':
             return alt+"/"+alt, {alt, alt}
         return alt+"/"+ref, {alt, ref}
 
 
-    def get_color(self, w, scale = 1.5):
+    def get_color(self, w: float, scale: float = 1.5) -> str:
         w = float(w)
         if w < 0:
             w = w * -1
             w = 1 - w * scale
             if w < 0:
                 w = 0
-            color = format(int(w * 255), 'x')
+            color: str = format(int(w * 255), 'x')
             if len(color) == 1:
                 color = "0" + color
             color = "ff" + color + color
@@ -77,12 +77,12 @@ class CravatPostAggregator (BasePostAggregator):
 
 
     def setup (self):
-        self.result_path = Path(self.output_dir, self.run_name + "_longevity.sqlite")
-        self.longevity_conn = sqlite3.connect(self.result_path)
-        self.longevity_cursor = self.longevity_conn.cursor()
+        self.result_path:Path = Path(self.output_dir, self.run_name + "_longevity.sqlite")
+        self.longevity_conn:sqlite3.Connection = sqlite3.connect(self.result_path)
+        self.longevity_cursor:sqlite3.Cursor = self.longevity_conn.cursor()
         self.ref_homo.init(self, self.longevity_cursor, self.sql_insert)
         self.ref_homo.setup()
-        sql_create = """ CREATE TABLE IF NOT EXISTS longevitymap (
+        sql_create:str = """ CREATE TABLE IF NOT EXISTS longevitymap (
             id integer NOT NULL PRIMARY KEY,
             weight float,
             weightcolor float,
@@ -106,13 +106,13 @@ class CravatPostAggregator (BasePostAggregator):
         self.longevity_cursor.execute("DELETE FROM longevitymap;")
         self.longevity_conn.commit()
 
-        cur_path = str(Path(__file__).parent)
-        self.data_conn = sqlite3.connect(Path(cur_path, "data", "longevitymap.sqlite"))
-        self.data_cursor = self.data_conn.cursor()
+        cur_path:str = str(Path(__file__).parent)
+        self.data_conn:sqlite3.Connection = sqlite3.connect(Path(cur_path, "data", "longevitymap.sqlite"))
+        self.data_cursor:sqlite3.Cursor = self.data_conn.cursor()
 
 
-    def merge_records(self, row, record):
-        need_info = False
+    def merge_records(self, row:tuple, record:list) -> list:
+        need_info:bool = False
         if record is None:
             record = list(row)
             record[6] = []
@@ -176,43 +176,43 @@ class CravatPostAggregator (BasePostAggregator):
     # 'priority': str(priority)
 
     def annotate (self, input_data):
-        rsid = str(input_data['dbsnp__rsid'])
+        rsid:str = str(input_data['dbsnp__rsid'])
         if rsid == '':
             return
 
         if not rsid.startswith('rs'):
             rsid = "rs" + rsid
-        query = 'SELECT variant.id, association, population.name, identifier, symbol, quickpubmed, study_design, conclusions ' \
+        query:str = 'SELECT variant.id, association, population.name, identifier, symbol, quickpubmed, study_design, conclusions ' \
                 'FROM variant, population, gene, allele_weights WHERE  ' \
                 'variant.identifier = "{rsid}" AND variant.population_id = population.id AND variant.gene_id = gene.id AND ' \
                 'allele_weights.rsid = variant.identifier AND allele_weights.allele = "{alt}" GROUP BY variant.id'.format(
             rsid=rsid, alt=input_data['base__alt_base'])
 
         self.data_cursor.execute(query)
-        rows = self.data_cursor.fetchall()
+        rows:tuple = self.data_cursor.fetchall()
 
         if len(rows) == 0:
             return None
 
-        record = None
+        record:list = None
         for row in rows:
             record = self.merge_records(row, record)
 
-        zygot = input_data['vcfinfo__zygosity']
+        zygot:str = input_data['vcfinfo__zygosity']
         if zygot is None or zygot == "":
             zygot = "het"
 
-        alt = input_data['base__alt_base']
-        ref = input_data['base__ref_base']
+        alt:str = input_data['base__alt_base']
+        ref:str = input_data['base__ref_base']
 
-        query2 = f"SELECT weight, priority FROM allele_weights WHERE rsid = '{rsid}' AND zygosity = '{zygot}' AND allele = '{alt}'"
+        query2:str = f"SELECT weight, priority FROM allele_weights WHERE rsid = '{rsid}' AND zygosity = '{zygot}' AND allele = '{alt}'"
         self.data_cursor.execute(query2)
-        rows2 = self.data_cursor.fetchall()
+        rows2:tuple = self.data_cursor.fetchall()
         if len(rows2) == 0:
             return
-        allel_row = rows2[0]
+        allel_row:tuple = rows2[0]
         w = allel_row[0]
-        priority = allel_row[1]
+        priority:str = allel_row[1]
 
         if len(rows2) > 1:
             print("Worning unexpected number of rows in allel_row in longevitymap postagregator!!!____________________________________________")
@@ -226,11 +226,11 @@ class CravatPostAggregator (BasePostAggregator):
         if w == 0:
             return
 
-        color = self.get_color(w, 1.5)
+        color:str = self.get_color(w, 1.5)
         # temp = self._createSubTable(record[6])
         # temp += record[7].replace("____", "<br/>").replace("__", " ")
 
-        task = (w, color, record[2], rsid, record[4], json.dumps(record[6]), json.dumps(record[7]),
+        task:tuple = (w, color, record[2], rsid, record[4], json.dumps(record[6]), json.dumps(record[7]),
                 input_data['base__coding'], ref, alt, input_data['base__cchange'], input_data['clinvar__disease_names'],
                 zygot, input_data['gnomad__af'], nuq, priority, input_data['ncbigene__ncbi_desc'])
 
