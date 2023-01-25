@@ -17,65 +17,24 @@ class RefHomoEdgecases:
     ref_homo_map:dict[str, dict] = {}
 
 
-    def init(self, parent, longevity_cursor:sqlite3.Cursor, sql_insert:str) -> None:
-        self.longevity_cursor:sqlite3.Cursor = longevity_cursor
-        self.sql_insert:str = sql_insert
+    def setup(self, parent, result_cursor:sqlite3.Cursor, data_cursor:sqlite3.Cursor, sql_insert:str) -> None:
+        self.result_cursor:sqlite3.Cursor = result_cursor
+        self.data_cursor:sqlite3.Cursor = data_cursor
+        self.sql_insert: str = sql_insert
         self.parent = parent
+
+        try:
+            self.data_cursor.execute(self.sql_ref_homozygot)
+            ref_homozygots:tuple = self.data_cursor.fetchall()
+            for row in ref_homozygots:
+                self.ref_homo_map[row[0]] = {ALLELE:row[1], WEIGHT:row[2], EXIST:True}
+
+        except Error as e:
+            print(e)
 
 
     def setActive(self, active:bool) -> None:
         self._is_active:bool = active
-
-    def merge_records(self, row:tuple, record:list) -> list:
-        need_info:bool = False
-        if record is None:
-            record = list(row)
-            record[6] = []
-            record[7] = []
-
-        record[7].append({"pubmedid": row[5], "study_design": row[6], "conclusions": row[7]})
-
-        if len(record) < 8:
-            print("Error les than 7 len ----------------------------------------")
-        if len(record[7]) == 0:
-            print("Error 7 is empty----------------------------------------------")
-
-        # id
-        if record[0] != row[0]:
-            record[0] = MULTIPLE_CONST
-            need_info = True
-
-        # association
-        if record[1] != row[1]:
-            record[1] = CONFLICTED_CONST
-            need_info = True
-
-        # population
-        if record[2] != row[2]:
-            record[2] = MULTIPLE_CONST
-            need_info = True
-        # identifier
-        if record[3] != row[3]:
-            record[3] = CONFLICTED_INDEX
-            need_info = True
-
-        # symbol (GENE)
-        if record[4] != row[4]:
-            record[4] = MULTIPLE_CONST
-            need_info = True
-
-        # quickpubmed
-        if record[5] != row[5]:
-            record[5] = CONFLICTED_INDEX
-            need_info = True
-
-        if need_info:
-            # print("Info--------------------------------------")
-            record[6].append(
-                {"id": row[0], "association": row[1], "population": row[2], "identifier": row[3], "gene": row[4],
-                 "pubmedid": row[5]})
-
-        return record
 
 
     def process_record(self, rsid, allele, w) -> None:
@@ -89,15 +48,15 @@ class RefHomoEdgecases:
                 ' GROUP BY variant.id'.format(
             rsid=rsid, alt=allele)
 
-        self.cursor.execute(query)
-        rows:tuple = self.cursor.fetchall()
+        self.data_cursor.execute(query)
+        rows:tuple = self.data_cursor.fetchall()
 
         if len(rows) == 0:
             return
 
         record:list = None
         for row in rows:
-            record = self.merge_records(row, record)
+            record = self.parent.merge_records(row, record)
 
         alt:str = allele
         ref:str = allele
@@ -107,24 +66,7 @@ class RefHomoEdgecases:
 
         task:tuple = (w, color, record[2], rsid, record[4], json.dumps(record[6]), json.dumps(record[7]), "", ref, alt, "", "", zygot, "", nuq, "0", "")
 
-        self.longevity_cursor.execute(self.sql_insert, task)
-
-
-    def setup(self) -> None:
-        # modules_path = str(Path(__file__).parent.parent.parent)
-        # sql_file = modules_path + "/annotators/longevitymap/data/longevitymap.sqlite"
-        sql_file:Pth = Path(str(Path(__file__).parent), "data", "longevitymap.sqlite")
-        if sql_file.exists():
-            self.longevitymap_conn:sqlite3.Connection = sqlite3.connect(sql_file)
-            self.cursor:sqlite3.Cursor = self.longevitymap_conn.cursor()
-            try:
-                self.cursor.execute(self.sql_ref_homozygot)
-                ref_homozygots:tuple = self.cursor.fetchall()
-                for row in ref_homozygots:
-                    self.ref_homo_map[row[0]] = {ALLELE:row[1], WEIGHT:row[2], EXIST:True}
-
-            except Error as e:
-                print(e)
+        self.result_cursor.execute(self.sql_insert, task)
 
 
     def process_row(self, row:list):
@@ -140,10 +82,6 @@ class RefHomoEdgecases:
         item:dict = self.ref_homo_map.get(rsid)
         if item:
             self.ref_homo_map[rsid][EXIST] = False
-            # zygot = row['vcfinfo__zygosity']
-            # alt = row['base__alt_base']
-            # if item[ALLELE] != alt or zygot != "hom":
-            #     self.ref_homo_map[rsid][EXIST] = False
 
 
     def end(self):
@@ -152,8 +90,3 @@ class RefHomoEdgecases:
         for rsid in self.ref_homo_map:
             if self.ref_homo_map[rsid][EXIST]:
                 self.process_record(rsid, self.ref_homo_map[rsid][ALLELE], self.ref_homo_map[rsid][WEIGHT])
-
-        if self.cursor is not None:
-            self.cursor.close()
-        if self.longevitymap_conn is not None:
-            self.longevitymap_conn.close()

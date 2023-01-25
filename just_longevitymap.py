@@ -68,20 +68,20 @@ class CravatPostAggregator (BasePostAggregator):
 
 
     def cleanup (self):
-        if self.longevity_cursor is not None:
-            self.longevity_cursor.close()
-        if self.longevity_conn is not None:
-            self.longevity_conn.commit()
-            self.longevity_conn.close()
+        if self.result_cursor is not None:
+            self.result_cursor.close()
+        if self.result_conn is not None:
+            self.result_conn.commit()
+            self.result_conn.close()
         return
 
 
     def setup (self):
         self.result_path:Path = Path(self.output_dir, self.run_name + "_longevity.sqlite")
-        self.longevity_conn:sqlite3.Connection = sqlite3.connect(self.result_path)
-        self.longevity_cursor:sqlite3.Cursor = self.longevity_conn.cursor()
-        self.ref_homo.init(self, self.longevity_cursor, self.sql_insert)
-        self.ref_homo.setup()
+        self.result_conn:sqlite3.Connection = sqlite3.connect(self.result_path)
+        self.result_cursor:sqlite3.Cursor = self.result_conn.cursor()
+
+
         sql_create:str = """ CREATE TABLE IF NOT EXISTS longevitymap (
             id integer NOT NULL PRIMARY KEY,
             weight float,
@@ -102,13 +102,15 @@ class CravatPostAggregator (BasePostAggregator):
             priority float,
             ncbidesc text          
             )"""
-        self.longevity_cursor.execute(sql_create)
-        self.longevity_cursor.execute("DELETE FROM longevitymap;")
-        self.longevity_conn.commit()
+        self.result_cursor.execute(sql_create)
+        self.result_cursor.execute("DELETE FROM longevitymap;")
+        self.result_conn.commit()
 
         cur_path:str = str(Path(__file__).parent)
         self.data_conn:sqlite3.Connection = sqlite3.connect(Path(cur_path, "data", "longevitymap.sqlite"))
         self.data_cursor:sqlite3.Cursor = self.data_conn.cursor()
+        # self.ref_homo.init(self, self.longevity_cursor, self.sql_insert)
+        self.ref_homo.setup(self, self.result_cursor, self.data_cursor, self.sql_insert)
 
 
     def merge_records(self, row:tuple, record:list) -> list:
@@ -234,7 +236,7 @@ class CravatPostAggregator (BasePostAggregator):
                 input_data['base__coding'], ref, alt, input_data['base__cchange'], input_data['clinvar__disease_names'],
                 zygot, input_data['gnomad__af'], nuq, priority, input_data['ncbigene__ncbi_desc'])
 
-        self.longevity_cursor.execute(self.sql_insert, task)
+        self.result_cursor.execute(self.sql_insert, task)
         return {"col1":""}
 
 
