@@ -237,7 +237,6 @@ class CravatPostAggregator (BasePostAggregator):
                 zygot, input_data['gnomad__af'], nuq, priority, input_data['ncbigene__ncbi_desc'])
 
         self.result_cursor.execute(self.sql_insert, task)
-        return {"col1":""}
 
 
     def postprocess(self):

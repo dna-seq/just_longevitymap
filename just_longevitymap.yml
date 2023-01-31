@@ -26,8 +26,6 @@ input_columns:
 - clinvar__disease_names
 - gnomad__af
 - ncbigene__ncbi_desc
-tags:
-- longevity
 output_columns:
 - name: col1
   title: clo1
@@ -36,6 +34,10 @@ output_columns:
   filterable: false
   hidden: true
   desc: dummy column
+  hide_from_gui_filter: true
+tags:
+- longevity
+
 developer:
   name: "Alex Karmazin"
   organization: "Just-DNA_seq"
