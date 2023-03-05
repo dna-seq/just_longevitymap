@@ -29,8 +29,9 @@ class CravatPostAggregator (BasePostAggregator):
                 alelfreq,
                 nucleotides,
                 priority,
-                ncbidesc         
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) """
+                ncbidesc,
+                category_name
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) """
 
     ref_homo:longevitymap_ref_homo.RefHomoEdgecases = longevitymap_ref_homo.RefHomoEdgecases()
 
@@ -100,7 +101,8 @@ class CravatPostAggregator (BasePostAggregator):
             alelfreq text,
             nucleotides text,
             priority float,
-            ncbidesc text          
+            ncbidesc text,
+            category_name test          
             )"""
         self.result_cursor.execute(sql_create)
         self.result_cursor.execute("DELETE FROM longevitymap;")
@@ -122,8 +124,8 @@ class CravatPostAggregator (BasePostAggregator):
 
         record[7].append({"pubmedid":row[5], "study_design":row[6], "conclusions":row[7]})
 
-        if len(record) < 8:
-            print("Error les than 7 len ----------------------------------------")
+        if len(record) < 9:
+            print("Error les than 8 len ----------------------------------------")
         if len(record[7]) == 0:
             print("Error 7 is empty----------------------------------------------")
 
@@ -156,9 +158,14 @@ class CravatPostAggregator (BasePostAggregator):
             record[5] = CONFLICTED_INDEX
             need_info = True
 
+        #category_name
+        if record[8] != row[8]:
+            record[8] = CONFLICTED_INDEX
+            need_info = True
+
         if need_info:
             # print("Info--------------------------------------")
-            record[6].append({"id":row[0], "association":row[1], "population":row[2], "identifier":row[3], "gene":row[4], "pubmedid":row[5]})
+            record[6].append({"id":row[0], "association":row[1], "population":row[2], "identifier":row[3], "gene":row[4], "pubmedid":row[5], "category_name":row[8]})
 
         return record
 
@@ -184,10 +191,10 @@ class CravatPostAggregator (BasePostAggregator):
 
         if not rsid.startswith('rs'):
             rsid = "rs" + rsid
-        query:str = 'SELECT variant.id, association, population.name, identifier, symbol, quickpubmed, study_design, conclusions ' \
-                'FROM variant, population, gene, allele_weights WHERE  ' \
-                'variant.identifier = "{rsid}" AND variant.population_id = population.id AND variant.gene_id = gene.id AND ' \
-                'allele_weights.rsid = variant.identifier AND allele_weights.allele = "{alt}" GROUP BY variant.id'.format(
+        query:str = 'SELECT variant.id, association, population.name, identifier, symbol, quickpubmed, study_design, conclusions, category_name ' \
+                'FROM variant, population, gene, allele_weights, categories, snps WHERE  ' \
+                'variant.identifier = "{rsid}" AND snps.rsid="{rsid}" AND variant.population_id = population.id AND variant.gene_id = gene.id AND ' \
+                'allele_weights.rsid = variant.identifier AND allele_weights.allele = "{alt}" AND category=category_id GROUP BY variant.id'.format(
             rsid=rsid, alt=input_data['base__alt_base'])
 
         self.data_cursor.execute(query)
@@ -217,7 +224,7 @@ class CravatPostAggregator (BasePostAggregator):
         priority:str = allel_row[1]
 
         if len(rows2) > 1:
-            print("Worning unexpected number of rows in allel_row in longevitymap postagregator!!!____________________________________________")
+            print("Warning unexpected number of rows in allel_row in longevitymap postagregator!!!____________________________________________")
 
         if record[1] != "significant":
             return
@@ -234,10 +241,13 @@ class CravatPostAggregator (BasePostAggregator):
 
         task:tuple = (w, color, record[2], rsid, record[4], json.dumps(record[6]), json.dumps(record[7]),
                 input_data['base__coding'], ref, alt, input_data['base__cchange'], input_data['clinvar__disease_names'],
-                zygot, input_data['gnomad__af'], nuq, priority, input_data['ncbigene__ncbi_desc'])
+                zygot, input_data['gnomad__af'], nuq, priority, input_data['ncbigene__ncbi_desc'], record[8])
 
         self.result_cursor.execute(self.sql_insert, task)
+        return {"col1":""}
 
 
     def postprocess(self):
         self.ref_homo.end()
+        
+

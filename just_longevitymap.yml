@@ -1,6 +1,6 @@
 title: Longevitymap postagregator
-version: 0.1.0
-data_version: 0.1.0
+version: 0.1.1
+data_version: 0.1.1
 type: postaggregator
 name: just_longevitymap
 level: variant
@@ -26,6 +26,8 @@ input_columns:
 - clinvar__disease_names
 - gnomad__af
 - ncbigene__ncbi_desc
+tags:
+- longevity
 output_columns:
 - name: col1
   title: clo1
@@ -34,10 +36,6 @@ output_columns:
   filterable: false
   hidden: true
   desc: dummy column
-  hide_from_gui_filter: true
-tags:
-- longevity
-
 developer:
   name: "Alex Karmazin"
   organization: "Just-DNA_seq"
@@ -46,3 +44,4 @@ developer:
   citation: ""
 release_note:
   0.1.0: first version
+  0.1.1: integrated new data for an updated report
