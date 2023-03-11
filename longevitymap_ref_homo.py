@@ -65,7 +65,7 @@ class RefHomoEdgecases:
         color:str = self.parent.get_color(w, 1.5)
 
         task:tuple = (w, color, record[2], rsid, record[4], json.dumps(record[6]), json.dumps(record[7]), "", ref, alt, "", "", zygot, "", nuq, "0", "", record[8])
-        
+
         self.longevity_cursor.execute(self.sql_insert, task)
 
 

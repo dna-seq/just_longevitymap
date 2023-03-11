@@ -234,7 +234,8 @@ class CravatPostAggregator (BasePostAggregator):
 
         if w == 0:
             return
-
+        if len(str(w))>5:
+            w = round(w, 3)
         color:str = self.get_color(w, 1.5)
         # temp = self._createSubTable(record[6])
         # temp += record[7].replace("____", "<br/>").replace("__", " ")
