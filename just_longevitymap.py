@@ -191,10 +191,10 @@ class CravatPostAggregator (BasePostAggregator):
 
         if not rsid.startswith('rs'):
             rsid = "rs" + rsid
-        query:str = 'SELECT variant.id, association, population.name, identifier, symbol, quickpubmed, study_design, conclusions, category_name ' \
-                'FROM variant, population, gene, allele_weights, categories, snps WHERE  ' \
-                'variant.identifier = "{rsid}" AND snps.rsid="{rsid}" AND variant.population_id = population.id AND variant.gene_id = gene.id AND ' \
-                'allele_weights.rsid = variant.identifier AND allele_weights.allele = "{alt}" AND category=category_id GROUP BY variant.id'.format(
+        query:str = 'SELECT variant.id, association, population.name, identifier, symbol, quickpubmed, study_design, conclusions, categories.name ' \
+                'FROM variant, population, gene, allele_weights, categories WHERE  ' \
+                'variant.identifier = "{rsid}" AND variant.population_id = population.id AND variant.gene_id = gene.id AND ' \
+                'allele_weights.rsid = variant.identifier AND allele_weights.allele = "{alt}" AND allele_weights.category_id=categories.id GROUP BY variant.id'.format(
             rsid=rsid, alt=input_data['base__alt_base'])
 
         self.data_cursor.execute(query)

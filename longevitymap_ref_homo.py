@@ -40,12 +40,10 @@ class RefHomoEdgecases:
     def process_record(self, rsid, allele, w) -> None:
         if not self._is_active:
             return
-        query:str = 'SELECT variant.id, association, population.name, identifier, symbol, quickpubmed, study_design, conclusions, category_name ' \
-                'FROM variant, population, gene, allele_weights, snps, categories WHERE  ' \
-                'variant.identifier = "{rsid}" AND snps.rsid="{rsid}" AND variant.population_id = population.id AND variant.gene_id = gene.id AND ' \
-                'allele_weights.rsid = variant.identifier AND allele_weights.allele = "{alt}" AND' \
-                ' allele_weights.state = "ref" AND allele_weights.zygosity = "hom" AND category=category_id' \
-                ' GROUP BY variant.id'.format(
+        query: str = 'SELECT variant.id, association, population.name, identifier, symbol, quickpubmed, study_design, conclusions, categories.name ' \
+                     'FROM variant, population, gene, allele_weights, categories WHERE  ' \
+                     'variant.identifier = "{rsid}" AND variant.population_id = population.id AND variant.gene_id = gene.id AND ' \
+                     'allele_weights.rsid = variant.identifier AND allele_weights.allele = "{alt}" AND allele_weights.category_id=categories.id GROUP BY variant.id'.format(
             rsid=rsid, alt=allele)
 
         self.data_cursor.execute(query)
@@ -66,7 +64,7 @@ class RefHomoEdgecases:
 
         task:tuple = (w, color, record[2], rsid, record[4], json.dumps(record[6]), json.dumps(record[7]), "", ref, alt, "", "", zygot, "", nuq, "0", "", record[8])
 
-        self.longevity_cursor.execute(self.sql_insert, task)
+        self.result_cursor.execute(self.sql_insert, task)
 
 
 
