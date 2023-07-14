@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/577868620.svg)](https://zenodo.org/badge/latestdoi/577868620)
 # just_longevitymap
 Longevity map postagregator for longevity report in OakVar. It is a part of [Oakvar-Longevity](https://github.com/dna-seq/oakvar-longevity) module.
 
