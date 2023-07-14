@@ -1,6 +1,6 @@
 title: Longevitymap postagregator
-version: 0.1.1
-data_version: 0.1.1
+version: 0.1.2
+data_version: 0.1.2
 type: postaggregator
 name: just_longevitymap
 level: variant
@@ -45,3 +45,4 @@ developer:
 release_note:
   0.1.0: first version
   0.1.1: integrated new data for an updated report
+  0.1.2: fixed problem with missused snps outdated table
