@@ -1,5 +1,5 @@
 title: Longevitymap postagregator
-version: 0.1.2
+version: 0.2.0
 data_version: 0.1.2
 type: postaggregator
 name: just_longevitymap
@@ -37,12 +37,13 @@ output_columns:
   hidden: true
   desc: dummy column
 developer:
-  name: Just-DNA-Seq
-  organization: Just-DNA-Seq
-  email: "just.dna.seq@gmail.com"
-  website: "https://dna-seq.github.io/"
+  name: "Alex Karmazin"
+  organization: "Just-DNA_seq"
+  email: "karmazzinalex@gmail.com"
+  website: "https://github.com/dna-seq/opencravat-longevity"
   citation: ""
 release_note:
   0.1.0: first version
   0.1.1: integrated new data for an updated report
   0.1.2: fixed problem with missused snps outdated table
+  0.2.0: added LLM summarization

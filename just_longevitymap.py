@@ -6,6 +6,8 @@ sys.path.append(cur_path)
 import sqlite3
 import longevitymap_ref_homo
 import json
+import requests
+import csv
 
 MULTIPLE_CONST = "multiple"
 CONFLICTED_CONST = "conflicted"
@@ -69,6 +71,8 @@ class CravatPostAggregator (BasePostAggregator):
 
 
     def cleanup (self):
+        self.categories = set(self.categories)
+        self.get_llm_answer()
         if self.result_cursor is not None:
             self.result_cursor.close()
         if self.result_conn is not None:
@@ -78,9 +82,17 @@ class CravatPostAggregator (BasePostAggregator):
 
 
     def setup (self):
+        self.categories = []
         self.result_path:Path = Path(self.output_dir, self.run_name + "_longevity.sqlite")
         self.result_conn:sqlite3.Connection = sqlite3.connect(self.result_path)
         self.result_cursor:sqlite3.Cursor = self.result_conn.cursor()
+
+        self.json_path = Path(self.output_dir, "output.json")
+        if self.json_path.is_file():
+            pass
+        else:
+            with open(self.json_path, "w") as json:
+                json.write("[{}]")
 
 
         sql_create:str = """ CREATE TABLE IF NOT EXISTS longevitymap (
@@ -102,7 +114,7 @@ class CravatPostAggregator (BasePostAggregator):
             nucleotides text,
             priority float,
             ncbidesc text,
-            category_name test          
+            category_name test
             )"""
         self.result_cursor.execute(sql_create)
         self.result_cursor.execute("DELETE FROM longevitymap;")
@@ -184,6 +196,92 @@ class CravatPostAggregator (BasePostAggregator):
     # 'weight': str(allel_row[3]),
     # 'priority': str(priority)
 
+
+    def get_llm_answer(self):
+        for category in self.categories:
+            tsv_path = Path(self.output_dir, category + ".tsv")
+            cursor_to_sqlite = self.result_cursor
+            cursor_to_sqlite.execute(f"SELECT * FROM longevitymap WHERE category_name = '{category}';")
+            column_names = list(map(lambda x: x[0], cursor_to_sqlite.description))
+            rows = cursor_to_sqlite.fetchall()
+
+            with open(tsv_path, 'w', encoding="utf-8") as tsv_file:
+                writer = csv.writer(tsv_file, delimiter='\t')
+                writer.writerow(column_names)
+                for row in rows:
+                    writer.writerow(list(row))
+
+            json_path = self.json_path
+            tsv_path = Path(self.output_dir, category + ".tsv")
+
+            url = "http://agingkills.eu:8088/v1/chat/completions"
+
+            prompt = """
+                        You will be provided a piece of personalized genomic report of some person.
+                        You have to analyze information and based on it provide recommendations that can be made based on the information.
+                        This recommendations should contain the following information:
+                        Identification of Crucial Genotypes: Highlighting specific genotypes that are significant for the individual's health,
+                        such as those related to common genetic disorders, responses to medications, or predispositions to certain conditions.
+                        Devide those Crucial Genotypes into two groups: 'Beneficial Genotypes' and 'Detrimental Genotypes'.
+                        Interactions Between Genotypes: Analyzing how different genotypes might interact with each other, either amplifying or
+                        mitigating risks. For example, some genetic variants might work together to increase the risk of a particular disease.
+                        Risk Assessment: Providing information on the risks associated with certain genotypes, such as the likelihood of
+                        developing specific diseases or conditions, always devide those risks into two groups: longevity related risks and general risks.
+                        Risk Reduction Strategies: Offering recommendations for lifestyle changes,
+                        dietary adjustments, or medical interventions that could help mitigate the risks associated with certain genetic profiles.
+                        Additional Insights: Any other relevant information that could be
+                        useful for the individual based on their genomic profile.
+                        Always make information clear, talk only about genes and genotypes that were provided to you, It should be clear, that you provide
+                        the summarization of the information of the genotypes and genes that were provided to you in the report.
+                        In your answer do not write the header of the whole text, for example, do not write "Personalized Genomic Report Analysis".
+                        Do not ask follow-up questions. Do not ask if the user understood the provided information or not.
+                        Also you should write your answer in HTML formatting. For small headers like "Risk Assessment", "Identification of Crucial Genotypes",
+                        "Interactions Between Genotypes", "Risk Reduction Strategies" and "Additional Insights" use tag <h3> with class="small-headers".
+                        When you want to provide a link you should use html tag <a> with "href" attribute where you place the link.
+                        If you want to make some of the text emphasized use <b> tag. Do not forget to divid information in different paragraphs so it looks
+                        better in HTML page. Never forget to close tags. Your answer will be inserted in already existing HTML page. So make sure to format
+                        it accordingly for this purpose. Everything should be wrapped in tags. If you don't know what tag to use for the main text, use <p> tag.
+                        Please use the following "summ" class for the div tag that you use to wrap the whole your answer.
+                        Here is the report information in tsv format style: '''
+                    """
+            with open(tsv_path, "r") as tsv_file:
+                tsv_info = tsv_file.read()
+
+            text_for_request = prompt + str(tsv_info)
+
+            json_api_openai = {'model': 'gpt-4o',
+                            'messages': [{'role': 'system', 'content': ''},
+                                            {'role': 'user', 'content': [{'type': 'text', 'text': text_for_request}]}
+                                            ],
+                                'stream': False,
+                                'max_tokens': 10000,
+                                'stop': ['[DONE]'],
+                                'temperature': 0}
+
+            json_for_mistral = {'model': 'mistral-large-latest',
+                                'messages': [{'role': 'system', 'content': ''},
+                                            {'role': 'user', 'content': [{'type': 'text', 'text': text_for_request}]}],
+                                            'stream': True, 'max_tokens': 10000,
+                                            'stop': ['[DONE]'],
+                                            'temperature': 0}
+            try:
+                answer = requests.post(url, json=json_api_openai)
+            except:
+                print(f"Can't make request to {url}")
+
+            answer = answer.json()
+            answer = answer["choices"][0]["message"]["content"]
+
+            answer = {category: str(answer)}
+
+            with open (json_path, mode="r+") as json_file:
+                json_file.seek(0,2)
+                position = json_file.tell() -1
+                json_file.seek(position)
+                json_file.write( ",{}]".format(json.dumps(answer)))
+        return
+
+
     def annotate (self, input_data):
         rsid:str = str(input_data['dbsnp__rsid'])
         if rsid == '':
@@ -228,7 +326,7 @@ class CravatPostAggregator (BasePostAggregator):
 
         if record[1] != "significant":
             return
-
+        
         self.ref_homo.process_row(input_data)
         nuq, nuq_set = self.get_nucleotides(ref, alt, zygot)
 
@@ -240,6 +338,7 @@ class CravatPostAggregator (BasePostAggregator):
         # temp = self._createSubTable(record[6])
         # temp += record[7].replace("____", "<br/>").replace("__", " ")
 
+        self.categories.append(record[8])
         task:tuple = (w, color, record[2], rsid, record[4], json.dumps(record[6]), json.dumps(record[7]),
                 input_data['base__coding'], ref, alt, input_data['base__cchange'], input_data['clinvar__disease_names'],
                 zygot, input_data['gnomad__af'], nuq, priority, input_data['ncbigene__ncbi_desc'], record[8])
@@ -250,5 +349,5 @@ class CravatPostAggregator (BasePostAggregator):
 
     def postprocess(self):
         self.ref_homo.end()
-        
+
 
